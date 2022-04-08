@@ -73,9 +73,24 @@ class FullyConnectedNet(object):
         # parameters should be initialized to zeros.                               #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        self.params['W1'] = np.random.normal(0.0, weight_scale, [input_dim, hidden_dims[0]])
+        self.params['b1'] = np.zeros(hidden_dims[0])
+        for idx in range(1, self.num_layers - 1):
+          W_name = 'W{}'.format(idx + 1)
+          b_name = 'b{}'.format(idx + 1)
+          self.params[W_name] = np.random.normal(0.0, weight_scale, [hidden_dims[idx - 1], hidden_dims[idx]])
+          self.params[b_name] = np.zeros(hidden_dims[idx])
+        max_idx = self.num_layers - 1
+        W_name = 'W{}'.format(max_idx + 1)
+        b_name = 'b{}'.format(max_idx + 1)
+        self.params[W_name] = np.random.normal(0.0, weight_scale, [hidden_dims[max_idx - 1], num_classes])
+        self.params[b_name] = np.zeros(num_classes)
+        if self.normalization == 'batchnorm' or self.normalization == 'layernorm':
+          for idx in range(1, self.num_layers):
+            gamma_name = 'gamma{}'.format(idx)
+            beta_name = 'beta{}'.format(idx)
+            self.params[gamma_name] = np.ones(hidden_dims[idx - 1])
+            self.params[beta_name] = np.zeros(hidden_dims[idx - 1])
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -147,8 +162,30 @@ class FullyConnectedNet(object):
         # layer, etc.                                                              #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
+        caches = []
+        dropout_caches = {}
+        out = X
+        for idx in range(self.num_layers - 1):
+          W_name = 'W{}'.format(idx + 1)
+          b_name = 'b{}'.format(idx + 1)
+          if self.normalization == 'batchnorm':
+            gamma_name = 'gamma{}'.format(idx + 1)
+            beta_name = 'beta{}'.format(idx + 1)
+            out, cache = affine_bn_relu_forward(out, self.params[W_name], self.params[b_name], self.params[gamma_name], self.params[beta_name], self.bn_params[idx])
+          elif self.normalization == 'layernorm':
+            gamma_name = 'gamma{}'.format(idx + 1)
+            beta_name = 'beta{}'.format(idx + 1)
+            out, cache = affine_ln_relu_forward(out, self.params[W_name], self.params[b_name], self.params[gamma_name], self.params[beta_name], self.bn_params[idx])
+          else:
+            out, cache = affine_relu_forward(out, self.params[W_name], self.params[b_name])
+          caches.append(cache)
+          if self.use_dropout:
+            out, cache = dropout_forward(out, self.dropout_param)
+            dropout_caches[idx] = cache
+        W_name = 'W{}'.format(self.num_layers)
+        b_name = 'b{}'.format(self.num_layers)       
+        scores, cache = affine_forward(out, self.params[W_name], self.params[b_name])
+        caches.append(cache)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -174,8 +211,37 @@ class FullyConnectedNet(object):
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
+        loss, dx = softmax_loss(scores, y)
+        for idx in reversed(range(self.num_layers)):
+          cache = caches[idx]
+          if idx == self.num_layers - 1:
+            dx, dW, db = affine_backward(dx, cache)
+          else:
+            if self.use_dropout:
+              dropout_cache = dropout_caches[idx]
+              dx = dropout_backward(dx, dropout_cache)
+            if self.normalization == 'batchnorm':
+              dx, dW, db, dgamma, dbeta = affine_bn_relu_backward(dx, cache)
+              gamma_name = 'gamma{}'.format(idx + 1)
+              beta_name = 'beta{}'.format(idx + 1)
+              grads[gamma_name] = dgamma
+              grads[beta_name] = dbeta
+            elif self.normalization == 'layernorm':
+              dx, dW, db, dgamma, dbeta = affine_ln_relu_backward(dx, cache)
+              gamma_name = 'gamma{}'.format(idx + 1)
+              beta_name = 'beta{}'.format(idx + 1)
+              grads[gamma_name] = dgamma
+              grads[beta_name] = dbeta
+            else:
+              dx, dW, db = affine_relu_backward(dx, cache)
+          W_name = 'W{}'.format(idx + 1)
+          b_name = 'b{}'.format(idx + 1)
+          W = self.params[W_name]
+          b = self.params[b_name]
+          loss += 0.5 * self.reg * np.sum(W * W)
+          dW += self.reg * W
+          grads[W_name] = dW
+          grads[b_name] = db
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
