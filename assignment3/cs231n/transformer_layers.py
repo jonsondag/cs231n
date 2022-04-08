@@ -37,9 +37,10 @@ class PositionalEncoding(nn.Module):
         # less than 5 lines of code.                                               #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        exp_val = torch.float_power(10000, torch.arange(0, -embed_dim, -2) / embed_dim)
+        exp_val_outer = torch.outer(torch.arange(0, max_len), exp_val)
+        pe[0, :, ::2] = torch.sin(exp_val_outer)
+        pe[0, :, 1::2] = torch.cos(exp_val_outer)
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -69,9 +70,8 @@ class PositionalEncoding(nn.Module):
         # afterward. This should only take a few lines of code.                    #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        output = x + self.pe[:, :S, :]
+        output = self.dropout(output)
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -125,9 +125,8 @@ class MultiHeadAttention(nn.Module):
         # solution is less than 5 lines.                                           #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        self.num_heads = num_heads
+        self.dropout_layer = nn.Dropout(p=dropout)
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -173,9 +172,31 @@ class MultiHeadAttention(nn.Module):
         #     function masked_fill may come in handy.                              #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        # Note disregard E in comments (D is used instead in code)
+        # TODO try without batching and see if it works, then see where the mistakes are
+        # TODO double check the application of softmax
+        H = self.num_heads
+        D_H = int(D / H)
+        XK = self.key(key)  # N,T,D x D,D --> N,T,D        
+        XK = XK.view([N, T, H, D_H])  # N,T,D --> N,T,H,D/H
+        XK = XK.permute([0,2,3,1])  # N,T,H,D/H --> N,H,D/H,T
+        XQ = self.query(query)  # N,S,D x D,D --> N,S,D
+        XQ = XQ.view([N, S, H, D_H])  # N,S,H --> N,S,H,D/H
+        XQ = XQ.permute([0,2,1,3])  # N,S,H,D/H --> N,H,S,D/H
+        XV = self.value(value)  # N,T,D x D,D --> N,T,D
+        XV = XV.view([N, T, H, D_H])
+        XV = XV.permute([0,2,1,3])  # N,T,H,D/H --> N,H,T,D/H
+        XQXK = XQ.matmul(XK)  # N,H,S,D/H x N,H,D/H,T --> N,H,S,T
+        norm_term = math.sqrt(D_H)
+        XQXK = XQXK / norm_term
+        if attn_mask is not None:
+          XQXK = XQXK.masked_fill(attn_mask == 0, -1e9)
+        XQXK = XQXK.softmax(axis=3)  # do softmax along output dimension
+        XQXK = self.dropout_layer(XQXK)  # dropout actually applied prior to calculating Y (different from what's in Transformer_Captioning.ipynb!)
+        Y = XQXK.matmul(XV)  # N,H,S,T x N,H,T,D/H --> N,H,S,D/H
+        Y = Y.permute([0,2,1,3])  # N,H,S,D/H -> N,S,H,D/H
+        Y = Y.reshape([N, S, D])  # N,S,H,D/H -> N,S,D
+        output = self.proj(Y)  # N,S,D x D,D --> N,S,D
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #

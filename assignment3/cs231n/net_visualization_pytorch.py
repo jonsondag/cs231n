@@ -33,9 +33,10 @@ def compute_saliency_maps(X, y, model):
     # the gradients with a backward pass.                                        #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    scores = model(X)
+    loss = torch.nn.functional.cross_entropy(scores, y)
+    loss.backward()
+    saliency = X.grad.abs().max(dim=1)[0]
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
     #                             END OF YOUR CODE                               #
@@ -75,9 +76,23 @@ def make_fooling_image(X, target_y, model):
     # You can print your progress over iterations to check your algorithm.       #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    max_iterations = 100
+    iter_num = 0
+    while iter_num < max_iterations:
+      scores = model(X_fooling)
+      pred_y = scores.data.max(1)[1][0].item()
+      if pred_y == target_y:
+        break
+      else:
+        loss = torch.nn.functional.cross_entropy(scores, torch.from_numpy(np.array([target_y])))
+        loss.backward()
+        with torch.no_grad():
+          grad = X_fooling._grad
+          grad_norm = torch.linalg.norm(grad)
+          dX = learning_rate * grad / grad_norm
+          X_fooling = X_fooling - dX
+          X_fooling = X_fooling.requires_grad_()
+      iter_num += 1
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
     #                             END OF YOUR CODE                               #
@@ -93,9 +108,16 @@ def class_visualization_update_step(img, model, target_y, l2_reg, learning_rate)
     # Be very careful about the signs of elements in your code.            #
     ########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    img = img.requires_grad_()
+    scores = model(img)
+    loss = -scores[0, target_y] + l2_reg * torch.linalg.norm(img) ** 2
+    loss.backward()
+    with torch.no_grad():
+      grad = img._grad
+      dX = learning_rate * grad
+      img.data = img.data - dX
+      img.grad.zero_()
+    return img
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ########################################################################
     #                             END OF YOUR CODE                         #
