@@ -27,9 +27,8 @@ def affine_forward(x, w, b):
     # will need to reshape the input into rows.                               #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    x_reshaped = np.reshape(x, [x.shape[0], -1])
+    out = x_reshaped.dot(w) + b
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -60,9 +59,10 @@ def affine_backward(dout, cache):
     # TODO: Implement the affine backward pass.                               #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    dw = np.reshape(x, [x.shape[0], -1]).T.dot(dout)
+    dx = dout.dot(w.T)
+    dx = dx.reshape(x.shape)
+    db = dout.sum(axis=0)
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -86,8 +86,7 @@ def relu_forward(x):
     # TODO: Implement the ReLU forward pass.                                  #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
+    out = np.maximum(x, 0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -113,9 +112,8 @@ def relu_backward(dout, cache):
     # TODO: Implement the ReLU backward pass.                                 #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    dx = dout
+    dout[x < 0] = 0
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -144,9 +142,19 @@ def svm_loss(x, y):
     # cs231n/classifiers/linear_svm.py.                                       #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    num_train = x.shape[0]
+    correct_class_scores = x[range(num_train), y].reshape([num_train, 1])
+    margin = x - correct_class_scores + 1
+    margin[range(num_train), y] = 0. # no loss for correct class
+    margin = np.maximum(margin, 0.0)
+    loss = np.sum(margin) / num_train
 
-    pass
-
+    dx = np.array(margin, copy=True)
+    dx[dx > 0] = 1.0
+    dx[dx < 0] = 0.0
+    pos_dx_count = dx.sum(axis=1)
+    dx[range(num_train), y] = -pos_dx_count
+    dx /= num_train
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -175,9 +183,23 @@ def softmax_loss(x, y):
     # cs231n/classifiers/softmax.py.                                          #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    num_train = x.shape[0]
+    correct_class_scores = x[range(x.shape[0]), y].reshape([x.shape[0], 1])
+    log_C = -np.max(x, axis=1).reshape([x.shape[0], 1])
+    correct_class_loss = -(correct_class_scores + log_C)
+    loss = np.sum(correct_class_loss)
+    exp_scores_plus_C = np.exp(x + log_C)
+    loss += np.sum(np.log(np.sum(exp_scores_plus_C, axis=1)))
+    loss /= num_train
 
-    pass
-
+    scores_plus_log_C = x + log_C
+    dx = np.zeros(x.shape)
+    dx[range(num_train), y] = -1
+    exp_scores = np.exp(scores_plus_log_C)
+    sum_exp_scores = np.sum(exp_scores, axis=1).reshape([num_train, 1])
+    div_sum_exp_scores = exp_scores / sum_exp_scores
+    dx += div_sum_exp_scores
+    dx /= num_train
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #

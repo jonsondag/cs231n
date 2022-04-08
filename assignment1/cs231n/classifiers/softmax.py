@@ -33,9 +33,27 @@ def softmax_loss_naive(W, X, y, reg):
     # regularization!                                                           #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    num_classes = W.shape[1]
+    num_train = X.shape[0]
+    for i in range(num_train):
+      scores = X[i].dot(W)
+      correct_class_score = scores[y[i]]
+      log_C = -np.max(scores)
+      loss -= (correct_class_score+log_C)
+      sum_scores = 0
+      grad = np.zeros_like(W)
+      for j in range(num_classes):
+        exp_score = np.exp(scores[j] + log_C)
+        sum_scores += exp_score
+        grad[:, j] += X[i]*exp_score
+      grad /= sum_scores
+      dW += grad
+      dW[:, y[i]] -= X[i]
+      loss += np.log(sum_scores)
+    loss /= num_train
+    loss += reg * np.sum(W * W)
+    dW /= num_train
+    dW += reg * 2*W
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     return loss, dW
@@ -58,9 +76,27 @@ def softmax_loss_vectorized(W, X, y, reg):
     # regularization!                                                           #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    num_train = X.shape[0]
+    scores = X.dot(W)
+    correct_class_scores = scores[range(scores.shape[0]), y].reshape([scores.shape[0], 1])
+    log_C = -np.max(scores, axis=1).reshape([scores.shape[0], 1])
+    correct_class_loss = -(correct_class_scores + log_C)
+    loss += np.sum(correct_class_loss)
+    exp_scores_plus_C = np.exp(scores + log_C)
+    loss += np.sum(np.log(np.sum(exp_scores_plus_C, axis=1)))
+    loss /= num_train
+    loss += reg * np.sum(W * W)
 
-    pass
-
+    scores_plus_log_C = scores + log_C
+    correct_class_loss = np.zeros(scores.shape)
+    correct_class_loss[range(num_train), y] = 1
+    dW -= X.T.dot(correct_class_loss)
+    exp_scores = np.exp(scores_plus_log_C)
+    sum_exp_scores = np.sum(exp_scores, axis=1).reshape([scores.shape[0], 1])
+    div_sum_exp_scores = exp_scores / sum_exp_scores
+    dW += X.T.dot(div_sum_exp_scores)
+    dW /= num_train
+    dW += reg * 2*W
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     return loss, dW

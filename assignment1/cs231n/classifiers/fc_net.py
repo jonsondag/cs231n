@@ -54,9 +54,10 @@ class TwoLayerNet(object):
         # weights and biases using the keys 'W2' and 'b2'.                         #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        self.params['W1'] = np.random.normal(0.0, weight_scale, [input_dim, hidden_dim])
+        self.params['b1'] = np.zeros(hidden_dim)
+        self.params['W2'] = np.random.normal(0.0, weight_scale, [hidden_dim, num_classes])
+        self.params['b2'] = np.zeros(num_classes)
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -87,9 +88,8 @@ class TwoLayerNet(object):
         # class scores for X and storing them in the scores variable.              #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        out1, cache1 = affine_relu_forward(X, self.params['W1'], self.params['b1'])
+        scores, cache2 = affine_forward(out1, self.params['W2'], self.params['b2'])
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -111,9 +111,17 @@ class TwoLayerNet(object):
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        loss, dx = softmax_loss(scores, y)
+        dx2, dW2, db2 = affine_backward(dx, cache2)
+        dx1, dW1, db1 = affine_relu_backward(dx2, cache1)
+        loss += 0.5 * self.reg * np.sum(self.params['W1'] * self.params['W1'])
+        loss += 0.5 * self.reg * np.sum(self.params['W2'] * self.params['W2'])
+        dW1 += self.reg * self.params['W1']
+        dW2 += self.reg * self.params['W2']
+        grads['W1'] = dW1
+        grads['b1'] = db1
+        grads['W2'] = dW2
+        grads['b2'] = db2
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #

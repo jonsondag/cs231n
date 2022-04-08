@@ -37,6 +37,8 @@ def svm_loss_naive(W, X, y, reg):
             margin = scores[j] - correct_class_score + 1  # note delta = 1
             if margin > 0:
                 loss += margin
+                dW[:, j] += X[i]
+                dW[:, y[i]] -= X[i]
 
     # Right now the loss is a sum over all training examples, but we want it
     # to be an average instead so we divide by num_train.
@@ -55,7 +57,8 @@ def svm_loss_naive(W, X, y, reg):
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    dW /= num_train
+    dW += reg * 2*W
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -68,19 +71,7 @@ def svm_loss_vectorized(W, X, y, reg):
 
     Inputs and outputs are the same as svm_loss_naive.
     """
-    loss = 0.0
-    dW = np.zeros(W.shape)  # initialize the gradient as zero
-
-    #############################################################################
-    # TODO:                                                                     #
-    # Implement a vectorized version of the structured SVM loss, storing the    #
-    # result in loss.                                                           #
-    #############################################################################
-    # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
-    # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    dW = np.zeros(W.shape)
 
     #############################################################################
     # TODO:                                                                     #
@@ -92,9 +83,24 @@ def svm_loss_vectorized(W, X, y, reg):
     # loss.                                                                     #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    num_train = X.shape[0]
+    scores = X.dot(W)
+    correct_class_scores = scores[range(scores.shape[0]), y].reshape([scores.shape[0], 1])
+    margin = scores - correct_class_scores + 1
+    margin = np.maximum(margin, 0.0)
+    margin[range(num_train), y] = 0  # no loss for correct class
+    
+    margin_pos = margin > 0
+    dW += X.T.dot(margin_pos)  # dW[:, j] += X[i] from naive case
+    correct_class_count = np.zeros(margin.shape)
+    pos_by_sample = np.sum(margin_pos, axis=1)    
+    correct_class_count[range(num_train), y] = pos_by_sample
+    dW -= X.T.dot(correct_class_count)  # dW[:, j] -= X[i] from naive case
 
-    pass
-
+    loss = np.sum(margin) / num_train
+    loss += reg * np.sum(W * W)
+    dW /= num_train
+    dW += reg * 2*W
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     return loss, dW
